@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Reservas culturales Sevilla</title></head>
+<body>
+  <h1>Reservas culturales de Sevilla</h1>
+  <form id="f">
+    <input id="nombre" placeholder="Nombre" required>
+    <input id="actividad" placeholder="Actividad" required>
+    <button>Reservar</button>
+  </form>
+  <ul id="lista"></ul>
+  <script>
+    async function cargar() {
+      const r = await fetch('/api/reservas');
+      const datos = await r.json();
+      lista.innerHTML = datos.map(d => `<li>${d.nombre} - ${d.actividad}</li>`).join('');
+    }
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      await fetch('/api/reservas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre.value, actividad: actividad.value })
+      });
+      f.reset();
+      cargar();
+    };
+    cargar();
+  </script>
+</body>
+</html>
