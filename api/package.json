@@ -1,0 +1,9 @@
+{
+  "name": "api-reservas",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "express": "4.21.1",
+    "mysql2": "3.11.3"
+  }
+}
