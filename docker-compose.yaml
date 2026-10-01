@@ -1,0 +1,65 @@
+services:
+
+  # ───────────── NGINX: punto de entrada (proxy inverso + frontend) ─────────────
+  web:
+    build: ./nginx                  # Construye la imagen con nginx/Dockerfile
+    ports:
+      - "80:8080"                   # host:contenedor. Es el ÚNICO puerto publicado.
+                                    # Nginx sin root escucha en 8080 dentro del contenedor
+    depends_on:
+      api:
+        condition: service_healthy  # No arranca hasta que la API responda al healthcheck
+    networks:
+      - frontend                    # Solo ve a la API, no tiene acceso a la base de datos
+    restart: unless-stopped         # Se reinicia solo si cae, salvo que lo pares tú
+
+  # ───────────── API: lógica de negocio (contenedor independiente) ─────────────
+  api:
+    build: ./api                    # Construye la imagen con api/Dockerfile
+    environment:                    # Variables que se leen del archivo .env
+      DB_HOST: db                   # Nombre del servicio = nombre DNS dentro de la red Docker
+      DB_NAME: ${DB_NAME}           # ${...} se sustituye por el valor de .env (no hay secretos en el repo)
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy  # Espera a que MySQL esté listo, no solo "iniciado"
+    networks:
+      - frontend                    # Para que Nginx pueda llamarla
+      - backend                     # Para poder hablar con la base de datos
+    healthcheck:                    # Docker comprueba periódicamente si la API está sana
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]  # Endpoint /health de la API
+      interval: 10s                 # Cada cuánto se comprueba
+      retries: 5                    # Fallos seguidos antes de marcarla como "unhealthy"
+    restart: unless-stopped
+
+  # ───────────── BASE DE DATOS: MySQL con almacenamiento persistente ─────────────
+  db:
+    image: mysql:8.4                # Imagen oficial con versión fija (no "latest"): reproducible
+    environment:                    # Configuración inicial de MySQL, también desde .env
+      MYSQL_DATABASE: ${DB_NAME}            # Crea esta base de datos al primer arranque
+      MYSQL_USER: ${DB_USER}                # Usuario de la aplicación (sin privilegios de root)
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}  # Contraseña del administrador
+    volumes:
+      - mysql_data:/var/lib/mysql   # Volumen con nombre: los datos sobreviven si se borra el contenedor
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Esquema inicial. Solo se ejecuta si el volumen está vacío.
+    networks:
+      - backend # Solo accesible desde la API
+        # NO hay "ports:" a propósito: la BD no se publica en el host
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      retries: 10                   # MySQL tarda en iniciar, por eso más reintentos
+    restart: unless-stopped
+
+# ───────────── REDES ─────────────
+networks:
+  frontend:                         # Red entre Nginx y la API
+  backend:                          # Red entre la API y la base de datos
+    internal: true                  # Sin salida a internet ni al exterior: aislamiento extra para la BD
+
+# ───────────── VOLÚMENES ─────────────
+volumes:
+  mysql_data:                       # Lo gestiona Docker. Persiste hasta que ejecutes "docker compose down -v"
