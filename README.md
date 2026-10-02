@@ -83,11 +83,3 @@ Para revisar únicamente los logs del proxy Nginx:
     ```bash
        docker compose logs -f web
     ```
-# 7. Defensa del diseño
-*   Principio de Mínimo Privilegio: Tanto Nginx como Node.js se ejecutan bajo usuarios sin privilegios de root dentro de sus contenedores.
-
-*   Aislamiento de Red: La base de datos opera en una subred interna, impidiendo totalmente el acceso externo o desde la red pública.
-
-*   Control de Secretos: No se incluyen contraseñas en texto plano dentro del repositorio Git; todas se inyectan dinámicamente mediante el archivo .env ignorado por control de versiones.   
-
-*   Reproducibilidad: Se emplean versiones de imágenes acotadas y específicas (mysql:8.4, node:20.18-alpine, nginxinc/nginx-unprivileged:1.27-alpine) para evitar fallos derivados de cambios en versiones.
